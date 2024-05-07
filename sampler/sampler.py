@@ -22,11 +22,9 @@ class CallNode:
     def print_tree(self, indent=0):
         indent_str = '    ' * indent
         print(f"{indent_str}{self.name} ({self.total_time} seconds)")
-        if self.last_child:
-            self.last_child.print_tree(indent + 1)
-        for child in sorted(self.children.values(), key=lambda x: x.name):
-            if child is not self.last_child:
-                child.print_tree(indent + 1)
+        for child in self.children.values():
+            child.print_tree(indent + 1)
+
 
 class Sampler:
     def __init__(self, tid):
