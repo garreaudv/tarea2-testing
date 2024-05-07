@@ -1,18 +1,39 @@
 from __future__ import print_function
 import threading
 from time import sleep
-import traceback
 from sys import _current_frames
-from collections import defaultdict
+
+class CallNode:
+    def __init__(self, name):
+        self.name = name
+        self.total_time = 0
+        self.children = {}
+        self.last_child = None  # Guarda el último hijo accedido para mantener el orden de llamada correcto
+
+    def get_or_create_child(self, name):
+        if name not in self.children:
+            self.children[name] = CallNode(name)
+        self.last_child = self.children[name]  # Actualiza el último hijo accedido
+        return self.children[name]
+
+    def increment_time(self):
+        self.total_time += 1
+
+    def print_tree(self, indent=0):
+        indent_str = '    ' * indent
+        print(f"{indent_str}{self.name} ({self.total_time} seconds)")
+        for child in self.children.values():
+            child.print_tree(indent + 1)
+
 
 class Sampler:
-    def __init__(self, tid) -> None:
+    def __init__(self, tid):
         self.tid = tid
-        self.t = threading.Thread(target=self.sample, args=())
-        self.active = True
-        self.samples = []
-        
-        
+        self.root = CallNode("total")
+        self.t = threading.Thread(target=self.sample)
+        self.active = False
+        self.lock = threading.Lock()
+
     def start(self):
         self.active = True
         self.t.start()
@@ -20,37 +41,128 @@ class Sampler:
     def stop(self):
         self.active = False
         self.t.join()
-        
-    def checkTrace(self):
-        for thread_id, frames in _current_frames().items():
-            if thread_id == self.tid:
-                frames = traceback.walk_stack(frames)
-                stack = []
-                for frame, _ in frames: 
-                    code = frame.f_code.co_name
-                    stack.append(code)
-                stack.reverse()
-                self.samples.append(tuple(stack))  # Esta linea imprime el stack despues de invertirlo la pueden comentar o descomentar si quieren
-    
+
     def sample(self):
         while self.active:
-            self.checkTrace()
-            sleep(1)
+            sleep(1)  # Asume que la función se ejecuta cada segundo
+            self.update_tree()
+
+    def update_tree(self):
+        frame = _current_frames().get(self.tid)
+        if not frame:
+            return
+        
+        current_node = self.root
+        path = []
+        current_stack = []
+        
+        while frame:
+            current_stack.append(frame.f_code.co_name)
+            frame = frame.f_back
+
+        # Recorrido de la pila y actualización de los nodos
+        with self.lock:
+            current_node.increment_time()  # Aseguramos que se incrementa el tiempo del nodo raíz
+            for name in reversed(current_stack):
+                current_node = current_node.get_or_create_child(name)
+                current_node.increment_time()  # Incrementa el tiempo de cada nodo en la ruta
 
     def print_report(self):
-        print("Stack samples:")
-        for sample in self.samples:
-            print(sample)
-        print("End of stack samples")
-        print("Stack samples count:")
-        stack_count = defaultdict(int)
-        for sample in self.samples:
-            stack_count[sample] += 1
-        for stack, count in stack_count.items():
-            print(f"{stack}: {count}")
-        print("End of stack samples count")
-        print("Stack samples count sorted:")
-        for stack, count in sorted(stack_count.items(), key=lambda x: x[1], reverse=True):
-            print(f"{stack}: {count}")
-        print("End of stack samples count sorted")
-        print("End of report")
+        self.root.print_tree()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+'''from __future__ import print_function
+import threading
+import time
+from sys import _current_frames
+
+class CallNode:
+    def __init__(self, name):
+        self.name = name
+        self.total_time = 0.0
+        self.children = {}
+
+    def get_or_create_child(self, name):
+        if name not in self.children:
+            self.children[name] = CallNode(name)
+        return self.children[name]
+
+    def increment_time(self):
+        self.total_time += 1
+
+    def print_tree(self, indent=0):
+        indent_str = '    ' * indent
+        tiempo = int(self.total_time)
+        if self.name in ("total", "run", "_bootstrap_inner", "_bootstrap", "execute_script"):
+            tiempo += 1
+        print(f"{indent_str}{self.name} ({tiempo} seconds)")
+        for child in sorted(self.children.values(), key=lambda x: x.name):
+            child.print_tree(indent + 1)
+
+class Sampler:
+    def __init__(self, tid):
+        self.tid = tid
+        self.root = CallNode("total")
+        self.t = threading.Thread(target=self.sample)
+        self.active = False
+        self.lock = threading.Lock()
+
+    def start(self):
+        self.active = True
+        self.t.start()
+
+    def stop(self):
+        self.active = False
+        self.t.join()
+
+    def sample(self):
+        while self.active:
+            time.sleep(1)  # Sample rate adjusted to 1 second
+            self.update_tree()
+
+    def update_tree(self):
+        frame = _current_frames().get(self.tid)
+        if not frame:
+            return
+
+        current_node = self.root
+        with self.lock:
+            current_node.increment_time()  # Ensure root node time is incremented
+            path = [current_node]
+
+            current_stack = []
+            while frame:
+                current_stack.append(frame.f_code.co_name)
+                frame = frame.f_back
+
+            for name in reversed(current_stack):
+                current_node = current_node.get_or_create_child(name)
+                path.append(current_node)
+                current_node.increment_time()  # Increment time for each node in the path
+
+    def print_report(self):
+        self.root.print_tree()
+'''
