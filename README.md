@@ -8,3 +8,7 @@ Mayoritariamente hecha por Matías, revisada por ambos en sesión de Discord
 
 ## Muestreo
 Hecho por ambos a través de pair-programming por Discord
+
+## Considraciones
+Se utilizaron herramientas de IA para la comprension y redaccion del codigo. 
+
