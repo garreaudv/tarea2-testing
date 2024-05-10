@@ -36,10 +36,9 @@ class FunctionInstrumentor(NodeTransformer):
                                 args=argNames,
                                 keywords=[]))       
         
-        # Insert before statement
+
         transformedNode.body.insert(0, before)
 
-        # Handle the return
         last_stmt = transformedNode.body[-1]
 
         if isinstance(last_stmt, Return):
